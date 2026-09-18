@@ -1,0 +1,2 @@
+"""Communication service tests."""
+
