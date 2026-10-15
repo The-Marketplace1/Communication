@@ -17,11 +17,13 @@ from src.events.bus import EventBus
 from src.providers.twilio.webhooks import normalize_status, require_valid_webhook
 from src.types.models import Actor, CommunicationEvent
 from src.validation.validators import actor_type, required_string
+
 class Router:
     def __init__(self, chat: ChatService, calls: Any, event_bus: EventBus) -> None:
         self.chat = chat
         self.calls = calls
         self.event_bus = event_bus
+
     def __call__(self, environ: dict[str, Any], start_response: Any) -> list[bytes]:
         try:
             method = environ.get("REQUEST_METHOD", "GET").upper()
@@ -56,13 +58,9 @@ class Router:
                 return self.webhook(environ, start_response)
             return application_error(start_response, NotFoundError("route not found"))
         except CommunicationError as error:
-            return 
-application_error(start_response, error)
+            return application_error(start_response, error)
         except Exception:
-            return application_error(
-                return 
-application_error(start_response, InternalError("internal communication error"))
-                
+            return application_error(start_response, InternalError("internal communication error"))
 
     @staticmethod
     def actor(environ: dict[str, Any]) -> Actor:
@@ -71,6 +69,7 @@ application_error(start_response, InternalError("internal communication error"))
         if not actor_id or not actor_kind:
             raise AuthenticationError("X-Actor-Id and X-Actor-Type are required")
         return Actor(actor_id, actor_type(actor_kind))  # type: ignore[arg-type]
+
     def webhook(self, environ: dict[str, Any], start_response: Any) -> list[bytes]:
         form = read_form(environ)
         token = os.getenv("TWILIO_AUTH_TOKEN", "")
@@ -89,7 +88,7 @@ application_error(start_response, InternalError("internal communication error"))
             normalize_status(required_string(form, "CallStatus")),
         )
         self.event_bus.publish(
-	    CommunicationEvent(
+            CommunicationEvent(
                 events.PROVIDER_WEBHOOK_RECEIVED, call_id, "provider", {"status": form["CallStatus"]}
             )
         )
