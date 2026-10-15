@@ -9,19 +9,21 @@ import secrets
 from urllib.parse import quote, urlencode
 from src.errors.exceptions import ProviderError
 from typing import Protocol
+
 class TwilioClient(Protocol):
     def start_masked_call(
         self, *, caller_number: str, recipient_number: str, callback_reference: str
     ) -> str:
         ...
+
 class LocalTwilioClient:
     """Deterministic local provider substitute that never contacts Twilio."""
     def start_masked_call(
         self, *, caller_number: str, recipient_number: str, callback_reference: str
     ) -> str:
         del caller_number, recipient_number
-        return 
-f"local_{callback_reference}_{secrets.token_hex(4)}"
+        return f"local_{callback_reference}_{secrets.token_hex(4)}"
+
 class HttpTwilioClient:
     """Twilio REST adapter for masked outbound calls."""
 
@@ -31,13 +33,13 @@ class HttpTwilioClient:
         account_sid: str,
         auth_token: str,
         twilio_number: str,
-	public_base_url: str,
+        public_base_url: str,
         timeout_seconds: int = 10,
     ) -> None:
         self.account_sid = account_sid
         self.auth_token = auth_token
         self.twilio_number = twilio_number
-	self.public_base_url = public_base_url.rstrip("/")
+        self.public_base_url = public_base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
 
     def start_masked_call(
@@ -57,7 +59,7 @@ class HttpTwilioClient:
                 "To": caller_number,
                 "From": self.twilio_number,
                 "Twiml": twiml,
-		StatusCallback": f"{self.public_base_url}/v1/providers/twilio/webhooks",
+                "StatusCallback": f"{self.public_base_url}/v1/providers/twilio/webhooks",
                 "StatusCallbackEvent": "initiated ringing answered completed",
             }
         ).encode()
@@ -106,4 +108,3 @@ class TwilioConfiguration:
             os.getenv(name)
             for name in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_NUMBER")
         )
-
