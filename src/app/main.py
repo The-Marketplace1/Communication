@@ -13,8 +13,9 @@ from src.providers.twilio.client import (
     TwilioClient,
     TwilioConfiguration,
 )
-
 from src.app.config import settings
+
+
 def build_application() -> Router:
     event_bus = EventBus()
     conversations = ConversationRepository()
@@ -26,18 +27,21 @@ def build_application() -> Router:
             auth_token=os.environ["TWILIO_AUTH_TOKEN"],
             twilio_number=os.environ["TWILIO_NUMBER"],
             public_base_url=settings.public_base_url,
-            
-            
         )
     else:
         twilio = LocalTwilioClient()
-    calls = CallService(conversations, event_bus, twilio())
+    
+    # Fixed: Passed 'twilio' directly instead of trying to invoke it as a function
+    calls = CallService(conversations, event_bus, twilio)
     return Router(chat, calls, event_bus)
+
+
 def main() -> None:
     application = build_application()
     with make_server(settings.host, settings.port, application) as server:
         print(f"communication service listening on {settings.host}:{settings.port}", flush=True)
         server.serve_forever()
+
+
 if __name__ == "__main__":
     main()
-
