@@ -10,16 +10,19 @@ from src.privacy.masking import mask_phone_number
 from src.types.models import Actor, CommunicationEvent, MaskedCall
 from src.utils.ids import new_id
 from src.validation.validators import phone_number, required_string
+
 class AbuseGuard:
     def __init__(self, max_calls_per_actor: int = 10) -> None:
         self.max_calls_per_actor = max_calls_per_actor
         self._calls: dict[str, int] = {}
+
     def check_call(self, actor_id: str) -> None:
         count = self._calls.get(actor_id, 0)
         if count >= self.max_calls_per_actor:
             from src.errors.exceptions import AbuseError
             raise AbuseError("call rate limit exceeded")
         self._calls[actor_id] = count + 1
+
 class CallService:
     def __init__(
         self,
@@ -33,6 +36,7 @@ class CallService:
         self.twilio = twilio
         self.abuse_guard = abuse_guard or AbuseGuard()
         self._calls: dict[str, MaskedCall] = {}
+
     def create_masked_call(self, actor: Actor, data: dict[str, object]) -> MaskedCall:
         conversation_id = required_string(data, "conversation_id")
         conversation = self.conversations.get(conversation_id)
@@ -76,10 +80,11 @@ class CallService:
             )
         )
         return call
+
     def apply_provider_update(self, call_id: str, status: str) -> MaskedCall:
         call = self._calls.get(call_id)
         if call is None:
-		call = next(
+            call = next(
                 (candidate for candidate in self._calls.values()
                  if candidate.provider_call_id == call_id),
                 None,
@@ -96,9 +101,9 @@ class CallService:
             CommunicationEvent(events.CALL_UPDATED, call.id, "provider", {"status": status})
         )
         return call
+
     def get_call(self, call_id: str) -> MaskedCall:
         call = self._calls.get(call_id)
         if call is None:
             raise NotFoundError("call not found")
         return call
-
