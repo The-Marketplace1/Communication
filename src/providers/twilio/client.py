@@ -6,7 +6,7 @@ import html
 import json
 import os
 import secrets
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from urllib.parse import quote, urlencode
 from src.errors.exceptions import ProviderError
 from typing import Protocol
@@ -98,13 +98,24 @@ class HttpTwilioClient:
         decoded_body = raw_body.decode("utf-8")
 
         try:
-            # Parse as XML if Twilio bypasses the Accept header or defaults to an XML response payload
+            # Parse as XML securely if Twilio bypasses the Accept header or defaults to an XML response payload
             if "xml" in content_type or decoded_body.strip().startswith("<?xml"):
                 root = ET.fromstring(decoded_body)
                 # Look up the Call SID element inside the Twilio XML structure
-                sid_element = root.find(".//Sid") or root.find(".//sid")
+                sid_element = (
+                    root.find(".//Sid") 
+                    or root.find(".//sid") 
+                    or root.find(".//Sid") 
+                    or root.find(".//RestException/Sid")
+                )
                 if sid_element is not None:
                     provider_call_id = sid_element.text
+                else:
+                    # Alternative payload structure parsing fallback strategy
+                    for elem in root.iter():
+                        if elem.tag.lower() == "sid":
+                            provider_call_id = elem.text
+                            break
             else:
                 # Fallback standard JSON parsing parsing logic
                 result = json.loads(decoded_body)
