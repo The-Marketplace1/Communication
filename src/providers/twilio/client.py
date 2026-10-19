@@ -6,6 +6,7 @@ import html
 import json
 import os
 import secrets
+import xml.etree.ElementTree as ET
 from urllib.parse import quote, urlencode
 from src.errors.exceptions import ProviderError
 from typing import Protocol
@@ -84,6 +85,7 @@ class HttpTwilioClient:
                 },
             )
             response = connection.getresponse()
+            content_type = response.getheader("Content-Type", "")
             raw_body = response.read()
         except OSError as exc:
             raise ProviderError("Twilio request failed") from exc
@@ -91,13 +93,28 @@ class HttpTwilioClient:
             connection.close()
         if response.status >= 400:
             raise ProviderError("Twilio rejected the masked call")
+        
+        provider_call_id = None
+        decoded_body = raw_body.decode("utf-8")
+
         try:
-            result = json.loads(raw_body.decode("utf-8"))
-            provider_call_id = result["sid"]
-        except (KeyError, TypeError, ValueError, UnicodeDecodeError) as exc:
-            raise ProviderError("Twilio returned an invalid call response") from exc
+            # Parse as XML if Twilio bypasses the Accept header or defaults to an XML response payload
+            if "xml" in content_type or decoded_body.strip().startswith("<?xml"):
+                root = ET.fromstring(decoded_body)
+                # Look up the Call SID element inside the Twilio XML structure
+                sid_element = root.find(".//Sid") or root.find(".//sid")
+                if sid_element is not None:
+                    provider_call_id = sid_element.text
+            else:
+                # Fallback standard JSON parsing parsing logic
+                result = json.loads(decoded_body)
+                provider_call_id = result.get("sid")
+        except (KeyError, TypeError, ValueError, ET.ParseError) as exc:
+            raise ProviderError("Twilio returned an invalid call response payload structure") from exc
+
         if not isinstance(provider_call_id, str) or not provider_call_id:
             raise ProviderError("Twilio returned an invalid call identifier")
+            
         del callback_reference
         return provider_call_id
 
